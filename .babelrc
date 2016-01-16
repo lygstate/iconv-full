@@ -1,0 +1,4 @@
+{
+  "plugins": ["transform-es2015-destructuring"],
+  "ignore": ["./node_modules/**/*", "./dist/**/*"]
+}
