@@ -63,6 +63,8 @@ exports.sortedIntegerArray = (array) => {
   return keys.sort(sortNumber)
 }
 
+exports.totalLength = 0
+
 // Input: map <dbcs num> -> <unicode num>
 // Resulting format: Array of chunks, each chunk is:
 // [0] = address of start of the chunk, hex string.
@@ -81,9 +83,10 @@ exports.generateTable = function (dbcs) {
   let prevIndex = -2
   for (let i of exports.sortedIntegerArray(Object.keys(dbcs))) {
     const char = arrToStr([dbcs[i]])
-    singleString += char
-    if (prevIndex + 1 !== i || charLength !== char.length) { // Range started.
-      charLength = char.length
+    const charString = new Buffer(char, 'utf8').toString('binary')
+    singleString += charString
+    if (prevIndex + 1 !== i || charLength !== charString.length) { // Range started.
+      charLength = charString.length
       dbcsOffsets.push(i)
       charLengths.push(charLength)
       unicodeOffsets.push(offset)
@@ -92,20 +95,38 @@ exports.generateTable = function (dbcs) {
     prevIndex = i
   }
   unicodeOffsets.push(offset)
+  let maxCharCode = 1
+  for (let i = 0; i < singleString.length; ++i) {
+    if (singleString.charCodeAt(i) > maxCharCode) {
+      maxCharCode = singleString.charCodeAt(i)
+    }
+  }
+  // if ((maxCharCode & 1) === 1) maxCharCode += 1
 
-  /*
+  // FIXME: TODO: FMIndex issue: when a single char repeat
+  // mutliple times, it's dead lock
   let fm = new FMIndex()
   fm.push(singleString)
-  fm.build(3)
+  fm.build(65536, 0xFF)
   console.log(singleString.length, fm.size())
   let dump = new BinaryOutput()
   fm.dump(dump)
-  */
+  let result = dump.result()
+  exports.totalLength += result.length
+  exports.totalLength += dbcsOffsets.length * 4
+  exports.totalLength += charLengths.length
+  exports.totalLength += unicodeOffsets.length * 4
+  console.log(`maxCharCode: ${maxCharCode}`)
+  console.log(`currentLength:${result.length} totalLength:${exports.totalLength}`)
 
   table.push(dbcsOffsets)
   table.push(charLengths)
   table.push(unicodeOffsets)
-  table.push(singleString)
+  let data = []
+  for (let value of (new Buffer(result, 'binary')).values()) {
+    data.push(value)
+  }
+  table.push(data)
   return table
 }
 
