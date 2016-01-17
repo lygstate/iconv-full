@@ -1,5 +1,4 @@
 {
-  "presets": ["react", "es2015"],
-  "plugins": ["transform-es2015-destructuring"],
-  "ignore": ["./node_modules/**/*", "./dist/**/*"]
+  "presets": ["es2015"],
+  "plugins": ["transform-react-jsx", "syntax-jsx"]
 }

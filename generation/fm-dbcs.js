@@ -1,7 +1,8 @@
-const {FMIndex} "fm-index.jsx";
-var utils = require("./utils"), 
-    errTo = require("errto"),
-    async = require("async");
+import { FMIndex } from 'fm-index'
+
+const utils = require("./utils");
+const errTo = require("errto");
+const async = require("async");
 
 async.parallel({
     $big5: utils.getFile.bind(null, "http://encoding.spec.whatwg.org/index-big5.txt"), // Encodings with $ are not saved. They are used to calculate other encs.

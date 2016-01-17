@@ -1,8 +1,7 @@
-
-var request = require('request'),
-    fs = require('fs'),
-    path = require('path'),
-    errTo = require('errto');
+var fs = require('fs-extra')
+var request = require('request')
+var path = require('path')
+var errTo = require('errto')
 
 // Common utilities used in scripts.
 
@@ -106,6 +105,8 @@ exports.writeTable = function(name, table) {
 }
 
 exports.writeFile = function(name, body) {
-    fs.writeFileSync(path.join(__dirname, "../encodings/tables", name + ".json"), body);
+    var tablesDir = path.join(__dirname, "../encodings/tables")
+    fs.mkdirsSync(tablesDir)
+    fs.writeFileSync(path.join(tablesDir, name + ".json"), body);
 }
 

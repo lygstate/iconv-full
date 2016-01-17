@@ -57,16 +57,18 @@ http.createServer(function(req, res) {
 
 ## Developments
 ```
+npm install # Installing all depedencies
+npm install -g babel-cli #For babel-node & babel
 npm install -g mocha # For running mocha tests
-npm install -g http-server # Installing the http-server for firefox test
-http-server # At the jsmime root directory
+npm install -g http-server # Installing the http-server for browsers(firefox/chrome) test
+http-server # At the code root directory
 
 npm install -g gulp # Installing gulp for mocha test with node
 
 gulp test #Running all the tests
 npm run mocha -- test\test_header.js #Used for running specific test case
 
-gulp bundle # Creating the dist\jsmime.js that could be able used in browser
+gulp bundle # Creating Browserified file that could be able used with browser(global)/node/requirejs
 gulp coverage # Viewing the running result
 gulp watch # Watch the file changes & generating the dist\jsmime.js automatically
 ```
