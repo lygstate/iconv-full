@@ -1,12 +1,12 @@
-var fs = require('fs-extra')
-var request = require('request')
-var path = require('path')
-var errTo = require('errto')
+let fs = require('fs-extra')
+let request = require('request')
+let path = require('path')
+let errTo = require('errto')
 
 // Common utilities used in scripts.
 
 exports.getFile = function (url, cb) {
-  var fullpath = path.join(__dirname, 'source-data', path.basename(url))
+  let fullpath = path.join(__dirname, 'source-data', path.basename(url))
   fs.readFile(fullpath, 'utf8', function (err, text) {
     if (!err) return cb(null, text)
     if (err.code !== 'ENOENT') return cb(err)
@@ -32,7 +32,7 @@ exports.parseText = function (text, splitChar) {
 // sequences (arrays) - we emit them prepended with U+0FFF-(length-2).
 // U+0FFF was chosen because it's small and unassigned, as well as 32 chars before it
 function arrToStr (arr) {
-  var s = ''
+  let s = ''
   for (let i = 0; i < arr.length; i++) {
     if (Array.isArray(arr[i])) {
       if (arr[i].length === 1) {
@@ -104,7 +104,7 @@ exports.writeTable = function (name, table) {
 }
 
 exports.writeFile = function (name, body) {
-  var tablesDir = path.join(__dirname, '../encodings/tables')
+  let tablesDir = path.join(__dirname, '../encodings/tables')
   fs.mkdirsSync(tablesDir)
   fs.writeFileSync(path.join(tablesDir, name + '.json'), body)
 }
