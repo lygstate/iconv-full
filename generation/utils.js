@@ -131,7 +131,7 @@ exports.generateTable = function (dbcs) {
   // TODO: FIXME: FMIndex doesn't support for 0 in string
   let fm = new FMIndex()
   fm.push(singleString)
-  fm.build(50, 0xFF)
+  fm.build(256, 0xFF)
 
   let dump = new BinaryOutput()
   fm.dump(dump)
@@ -160,7 +160,14 @@ exports.generateTable = function (dbcs) {
       ++matched
     }
   }
-  console.log(`The time diff is: ${Date.now() - begin}`)
+  console.log(`The time search is: ${Date.now() - begin}`)
+  begin = Date.now()
+  for (let pos = 0; pos < singleString.length; ++pos) {
+    if (fm.getSubstring(pos, 1).charCodeAt(0) !== singleString.charCodeAt(pos)) {
+      console.log(singleString.charCodeAt(pos))
+    }
+  }
+  console.log(`The time getPosition is: ${Date.now() - begin}`)
   return table
 }
 
