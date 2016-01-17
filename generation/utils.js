@@ -97,8 +97,10 @@ exports.generateTable = function (dbcs) {
     if (charString.length === 1 && charString[0].charCodeAt(0) < 0x80) {
       continue
     }
-    if (charString[0].charCodeAt(0) === 0) {
-      console.log('Warning, no zero')
+    for (let i = 0; i < charString.length; ++i) {
+      if (charString[0].charCodeAt(0) === 0) {
+        console.log('Warning, no zero')
+      }
     }
 
     if (!(charString in stringList)) {
@@ -129,7 +131,7 @@ exports.generateTable = function (dbcs) {
   // TODO: FIXME: FMIndex doesn't support for 0 in string
   let fm = new FMIndex()
   fm.push(singleString)
-  fm.build(65536, 0xFF)
+  fm.build(50, 0xFF)
 
   let dump = new BinaryOutput()
   fm.dump(dump)
@@ -138,7 +140,7 @@ exports.generateTable = function (dbcs) {
   exports.totalLength += dbcsOffsets.length * 4
   exports.totalLength += charLengths.length
   exports.totalLength += unicodeOffsets.length * 4
-  console.log(`maxCharCode: ${maxCharCode} fm size:${fm.size()} utf8 length:${singleString.length}`)
+  console.log(`maxCharCode: ${maxCharCode} fm size:${fm.size()} contentSize:${fm.contentSize()} utf8 length:${singleString.length}`)
   console.log(`currentLength:${result.length} totalLength:${exports.totalLength}`)
 
   table.push(dbcsOffsets)
@@ -146,17 +148,19 @@ exports.generateTable = function (dbcs) {
   table.push(unicodeOffsets)
   table.push(exports.bufferToIntArray(new Buffer(result, 'binary')))
 
+  let begin = Date.now()
   let matched = 0
   for (let charString in stringList) {
-    let poses = stringList[charString]
+    let poses = exports.sortedIntegerArray(stringList[charString])
     let chars = exports.bufferToIntArray(new Buffer(charString, 'binary'))
-    let serachedPoses = fm.search(charString)
+    let serachedPoses = exports.sortedIntegerArray(fm.search(charString))
     if (poses.toString() !== serachedPoses.toString()) {
       console.log(`${chars.toString()} search not match ${poses.toString()} ${serachedPoses.toString()} matched:${matched}`)
     } else {
       ++matched
     }
   }
+  console.log(`The time diff is: ${Date.now() - begin}`)
   return table
 }
 
