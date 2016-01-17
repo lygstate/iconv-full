@@ -51,13 +51,26 @@ async.parallel({
   // Calculate difference between big5 and cp950, and write it to a file.
   // See http://encoding.spec.whatwg.org/#big5-encoder
   let big5 = initDBCS(data.cp950)
+
   for (let i of utils.sortedIntegerArray(Object.keys(data.$big5))) { // Lead byte is 0x81 .. 0xFE
     let idx = toIdx(i)
     let big5Char = data.$big5[i]
     big5[idx] = big5Char
     let cpChar = data.cp950[idx]
     if (cpChar !== undefined && cpChar !== big5Char) {
-      console.log('Dont match: ', i.toString(16), idx.toString(16), big5Char, cpChar)
+      // https://lists.w3.org/Archives/Public/public-whatwg-archive/2012Apr/0095.html
+      /*
+      F9FE =>
+       opera-hk: U+FFED ?
+        firefox: U+2593 ?
+        chrome: U+2593 ?
+        firefox-hk: U+2593 ?
+        opera: U+2593 ?
+        chrome-hk: U+FFED ?
+        internetexplorer: U+2593 ?
+        hkscs-2008: <U+FFED> ?
+      */
+      console.log('Big5 dont match: ', i.toString(16), idx.toString(16), big5Char.toString(16), cpChar.toString(16))
     }
   }
 
@@ -145,6 +158,9 @@ async.parallel({
       const jis0208Char = data.$jis0208[idx]
       const jis0212Char = data.$jis0212[idx]
       // NOTE: We need to make sure the idx are exists
+      if (jis0208Char && jis0212Char) {
+        // console.log('Exist in both index')
+      }
       if (jis0208Char) eucJp[(i << 8) + j] = jis0208Char
       if (jis0212Char) eucJp[(0x8F << 16) + (i << 8) + j] = jis0212Char
     }
