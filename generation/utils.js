@@ -131,6 +131,21 @@ exports.generateTable = function (dbcs) {
   fm.push(singleString)
   fm.build(65536, 0xFF)
 
+  let dump = new BinaryOutput()
+  fm.dump(dump)
+  let result = dump.result()
+  exports.totalLength += result.length
+  exports.totalLength += dbcsOffsets.length * 4
+  exports.totalLength += charLengths.length
+  exports.totalLength += unicodeOffsets.length * 4
+  console.log(`maxCharCode: ${maxCharCode} fm size:${fm.size()} utf8 length:${singleString.length}`)
+  console.log(`currentLength:${result.length} totalLength:${exports.totalLength}`)
+
+  table.push(dbcsOffsets)
+  table.push(charLengths)
+  table.push(unicodeOffsets)
+  table.push(exports.bufferToIntArray(new Buffer(result, 'binary')))
+
   let matched = 0
   for (let charString in stringList) {
     let poses = stringList[charString]
@@ -142,21 +157,6 @@ exports.generateTable = function (dbcs) {
       ++matched
     }
   }
-
-  let dump = new BinaryOutput()
-  fm.dump(dump)
-  let result = dump.result()
-  exports.totalLength += result.length
-  exports.totalLength += dbcsOffsets.length * 4
-  exports.totalLength += charLengths.length
-  exports.totalLength += unicodeOffsets.length * 4
-  console.log(`maxCharCode: ${maxCharCode}`)
-  console.log(`currentLength:${result.length} totalLength:${exports.totalLength}`)
-
-  table.push(dbcsOffsets)
-  table.push(charLengths)
-  table.push(unicodeOffsets)
-  table.push(exports.bufferToIntArray(new Buffer(result, 'binary')))
   return table
 }
 
