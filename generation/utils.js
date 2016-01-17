@@ -65,6 +65,14 @@ exports.sortedIntegerArray = (array) => {
 
 exports.totalLength = 0
 
+exports.bufferToIntArray = (buffer) => {
+  let data = []
+  for (let value of buffer.values()) {
+    data.push(value)
+  }
+  return data
+}
+
 // Input: map <dbcs num> -> <unicode num>
 // Resulting format: Array of chunks, each chunk is:
 // [0] = address of start of the chunk, hex string.
@@ -81,9 +89,22 @@ exports.generateTable = function (dbcs) {
   let charLength = 0
   let offset = 0
   let prevIndex = -2
+  let stringList = {}
   for (let i of exports.sortedIntegerArray(Object.keys(dbcs))) {
     const char = arrToStr([dbcs[i]])
+
     const charString = new Buffer(char, 'utf8').toString('binary')
+    if (charString.length === 1 && charString[0].charCodeAt(0) < 0x80) {
+      continue
+    }
+    if (charString[0].charCodeAt(0) === 0) {
+      console.log('Warning, no zero')
+    }
+
+    if (!(charString in stringList)) {
+      stringList[charString] = []
+    }
+    stringList[charString].push(singleString.length)
     singleString += charString
     if (prevIndex + 1 !== i || charLength !== charString.length) { // Range started.
       charLength = charString.length
@@ -105,10 +126,23 @@ exports.generateTable = function (dbcs) {
 
   // FIXME: TODO: FMIndex issue: when a single char repeat
   // mutliple times, it's dead lock
+  // TODO: FIXME: FMIndex doesn't support for 0 in string
   let fm = new FMIndex()
   fm.push(singleString)
   fm.build(65536, 0xFF)
-  console.log(singleString.length, fm.size())
+
+  let matched = 0
+  for (let charString in stringList) {
+    let poses = stringList[charString]
+    let chars = exports.bufferToIntArray(new Buffer(charString, 'binary'))
+    let serachedPoses = fm.search(charString)
+    if (poses.toString() !== serachedPoses.toString()) {
+      console.log(`${chars.toString()} search not match ${poses.toString()} ${serachedPoses.toString()} matched:${matched}`)
+    } else {
+      ++matched
+    }
+  }
+
   let dump = new BinaryOutput()
   fm.dump(dump)
   let result = dump.result()
@@ -122,11 +156,7 @@ exports.generateTable = function (dbcs) {
   table.push(dbcsOffsets)
   table.push(charLengths)
   table.push(unicodeOffsets)
-  let data = []
-  for (let value of (new Buffer(result, 'binary')).values()) {
-    data.push(value)
-  }
-  table.push(data)
+  table.push(exports.bufferToIntArray(new Buffer(result, 'binary')))
   return table
 }
 
