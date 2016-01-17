@@ -2,6 +2,7 @@ let fs = require('fs-extra')
 let request = require('request')
 let path = require('path')
 let errTo = require('errto')
+import { FMIndex, BinaryOutput } from 'fm-index'
 
 // Common utilities used in scripts.
 
@@ -53,49 +54,56 @@ function arrToStr (arr) {
   return s
 }
 
+function sortNumber (a, b) {
+  return a - b
+}
+
+exports.sortedIntegerArray = (array) => {
+  let keys = array.map((x) => parseInt(x, 10))
+  return keys.sort(sortNumber)
+}
+
 // Input: map <dbcs num> -> <unicode num>
 // Resulting format: Array of chunks, each chunk is:
 // [0] = address of start of the chunk, hex string.
 // <str> - characters of the chunk.
 // <num> - increasing sequence of the length num, starting with prev character.
-exports.generateTable = function (dbcs, maxBytes) {
-  let minSeqLen = 4
+exports.generateTable = function (dbcs) {
+  // Do not record the sequence length, cause that
+  // doesn't save space much
   let table = []
-  let range
-  let block
-  let seqLen
-  let max = 1 << ((maxBytes || 2) * 8)
-  for (let i = 0x0000; i < max; i++) {
-    if (dbcs[i] !== undefined) {
-      if (dbcs[i - 1] === undefined) { // Range started.
-        range = [i.toString(16)] // Range[0] is starting address.
-        block = [] // Current block of character codes.
-        seqLen = 0 // Increasing sequence length at the end of the block.
-      } else if (typeof dbcs[i - 1] === 'number' && // We have arrays as elements of dbcs - check against it.
-        typeof dbcs[i] === 'number' &&
-        dbcs[i - 1] + 1 === dbcs[i]) { // Increasing sequence continues - track its length.
-        seqLen++
-      } else { // Increasing sequence ended (or not started at all).
-        if (seqLen >= minSeqLen) {
-          // Seq is long enough: write prev segment and its length.
-          range.push(arrToStr(block.slice(0, -seqLen)), seqLen)
-          block = []
-        }
-        seqLen = 0
-      }
-      block.push(dbcs[i])
-    } else if (range) { // Range finished, write last segments.
-      if (seqLen >= minSeqLen) {
-        range.push(arrToStr(block.slice(0, -seqLen)), seqLen)
-      } else {
-        range.push(arrToStr(block))
-      }
-
-      table.push(range)
-      range = null
+  let singleString = ''
+  let dbcsOffsets = []
+  let charLengths = []
+  let unicodeOffsets = []
+  let charLength = 0
+  let offset = 0
+  let prevIndex = -2
+  for (let i of exports.sortedIntegerArray(Object.keys(dbcs))) {
+    const char = arrToStr([dbcs[i]])
+    singleString += char
+    if (prevIndex + 1 !== i || charLength !== char.length) { // Range started.
+      charLength = char.length
+      dbcsOffsets.push(i)
+      charLengths.push(charLength)
+      unicodeOffsets.push(offset)
     }
+    offset += 1
+    prevIndex = i
   }
-
+  unicodeOffsets.push(offset)
+  /*
+  let fm = new FMIndex()
+  fm.push(singleString)
+  fm.build(3)
+  console.log(singleString.length, fm.size())
+  let dump = new BinaryOutput()
+  fm.dump(dump)
+  */
+  table.push(dbcsOffsets)
+  table.push(charLengths)
+  table.push(unicodeOffsets)
+  table.push(singleString)
   return table
 }
 
