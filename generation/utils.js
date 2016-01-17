@@ -92,6 +92,7 @@ exports.generateTable = function (dbcs) {
     prevIndex = i
   }
   unicodeOffsets.push(offset)
+
   /*
   let fm = new FMIndex()
   fm.push(singleString)
@@ -100,6 +101,7 @@ exports.generateTable = function (dbcs) {
   let dump = new BinaryOutput()
   fm.dump(dump)
   */
+
   table.push(dbcsOffsets)
   table.push(charLengths)
   table.push(unicodeOffsets)

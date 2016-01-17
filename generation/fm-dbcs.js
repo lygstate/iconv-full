@@ -4,7 +4,7 @@ const utils = require('./utils')
 const errTo = require('errto')
 const async = require('async')
 
-function initDBCS(from) {
+function initDBCS (from) {
   let to = {}
   for (let i = 0; i <= 0x80; ++i) {
     if (from[i] === undefined) {
