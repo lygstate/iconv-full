@@ -1,0 +1,22 @@
+require("babel-register")({
+
+  // Ignore can also be specified as a function.
+  ignore: function(filename) {
+    if (filename.endsWith('.jsx')) {
+      return false
+    }
+    if (filename.indexOf('/node_modules/') >= 0) {
+      return true
+    }
+    return false
+  },
+
+  // Setting this will remove the currently hooked extensions of .es6, `.es`, `.jsx`
+  // and .js so you'll have to add them back if you want them to be used again.
+  extensions: [".es6", ".es", ".jsx", ".js"]
+});
+
+const path = require('path')
+const script = path.join(process.cwd(), process.argv[2])
+console.log(script)
+require(script)
