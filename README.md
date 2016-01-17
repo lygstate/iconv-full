@@ -55,38 +55,20 @@ http.createServer(function(req, res) {
 });
 ```
 
-### [Deprecated] Extend Node.js own encodings
-> NOTE: This doesn't work on latest Node versions. See [details](https://github.com/ashtuchkin/iconv-lite/wiki/Node-v4-compatibility).
+## Developments
+```
+npm install -g mocha # For running mocha tests
+npm install -g http-server # Installing the http-server for firefox test
+http-server # At the jsmime root directory
 
-```javascript
-// After this call all Node basic primitives will understand iconv-lite encodings.
-iconv.extendNodeEncodings();
+npm install -g gulp # Installing gulp for mocha test with node
 
-// Examples:
-buf = new Buffer(str, 'win1251');
-buf.write(str, 'gbk');
-str = buf.toString('latin1');
-assert(Buffer.isEncoding('iso-8859-15'));
-Buffer.byteLength(str, 'us-ascii');
+gulp test #Running all the tests
+npm run mocha -- test\test_header.js #Used for running specific test case
 
-http.createServer(function(req, res) {
-    req.setEncoding('big5');
-    req.collect(function(err, body) {
-        console.log(body);
-    });
-});
-
-fs.createReadStream("file.txt", "shift_jis");
-
-// External modules are also supported (if they use Node primitives, which they probably do).
-request = require('request');
-request({
-    url: "http://github.com/", 
-    encoding: "cp932"
-});
-
-// To remove extensions
-iconv.undoExtendNodeEncodings();
+gulp bundle # Creating the dist\jsmime.js that could be able used in browser
+gulp coverage # Viewing the running result
+gulp watch # Watch the file changes & generating the dist\jsmime.js automatically
 ```
 
 ## Supported encodings
