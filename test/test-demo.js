@@ -16,8 +16,8 @@ describe('testing the cp936/gbk euro dollor symbol', function () {
     assert.equal(str, '\u2E81')
 
     str = iconv.decode(new Buffer([0xFE, 0x51]), 'gb18030')
-    assert.equal(str.length, 2)
-    assert.equal(str, '\u{20087}') // It's to PUA
+    assert.equal(str.length, 1)
+    assert.equal(str, '') // It's to PUA
 
     str = iconv.decode(new Buffer([0xFE, 0x52]), 'gb18030')
     assert.equal(str, '\uE817') // It's to PUA
@@ -29,7 +29,7 @@ describe('testing the cp936/gbk euro dollor symbol', function () {
     assert.equal(str, '\u2E84')
 
     str = iconv.decode(new Buffer([0xFE, 0x59]), 'gb18030')
-    assert.equal(str, '\u9FB4') // It's to PUA
+    assert.equal(str, '') // '\u9FB4' It's to PUA
   })
 
   it('test gbk pua encode', function () {

@@ -131,7 +131,7 @@ exports.generateTable = function (dbcs) {
   // TODO: FIXME: FMIndex doesn't support for 0 in string
   let fm = new FMIndex()
   fm.push(singleString)
-  fm.build(256, 0xFF)
+  fm.build(5, 0xFF)
 
   let dump = new BinaryOutput()
   fm.dump(dump)
