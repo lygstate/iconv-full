@@ -19,25 +19,33 @@ describe('testing BinaryIO', function () {
   })
 
   it('test_16bit_number', function () {
-    let output1 = new BinaryOutput()
-    output1.dump16bitNumber(0)
-    expect(output1.length).to.equal(2)
-    expect(output1.result().length).to.equal(2)
-    let input1 = new BinaryInput(output1.result())
-    expect(input1.capacity).to.equal(2)
-    expect(input1.length).to.equal(0)
-    expect(input1._buffer.buffer instanceof ArrayBuffer).to.equal(true)
-    expect(input1.load16bitNumber()).to.equal(0)
+    let input
+    let output
 
-    let output2 = new BinaryOutput()
-    output2.dump16bitNumber(65535)
-    let input2 = new BinaryInput(output2.result())
-    expect(input2.load16bitNumber()).to.equal(65535)
+    output = new BinaryOutput()
+    output.dump16bitNumber(0)
+    expect(output.length).to.equal(2)
+    expect(output.result().length).to.equal(2)
+    input = new BinaryInput(output.result())
+    expect(input.capacity).to.equal(2)
+    expect(input.length).to.equal(0)
+    expect(input._buffer.buffer instanceof ArrayBuffer).to.equal(true)
+    expect(input.load16bitNumber()).to.equal(0)
 
-    let output3 = new BinaryOutput()
-    output3.dump16bitNumber(65536)
-    let input3 = new BinaryInput(output2.result())
-    expect(input3.load16bitNumber()).not.to.equal(65536)
+    output = new BinaryOutput()
+    output.dump16bitNumber(65535)
+    input = new BinaryInput(output.result())
+    expect(input.load16bitNumber()).to.equal(65535)
+
+    output = new BinaryOutput()
+    output.dump16bitNumber(65536)
+    input = new BinaryInput(output.result())
+    expect(input.load16bitNumber()).not.to.equal(65536)
+
+    output = new BinaryOutput()
+    output.dump8bitNumber(0x80)
+    input = new BinaryInput(output.result())
+    expect(input.load8bitNumber()).to.equal(0x80)
   })
 
   it('test_32bit_number', function () {
@@ -58,22 +66,31 @@ describe('testing BinaryIO', function () {
   })
 
   it('test_string', function () {
-    let output1 = new BinaryOutput()
-    output1.dumpString('hello world')
-    let input1 = new BinaryInput(output1.result())
-    expect(input1.loadString()).to.equal('hello world')
+    let output
+    let input
+    output = new BinaryOutput()
+    output.dumpString('hello world')
+    input = new BinaryInput(output.result())
+    expect(input.loadString()).to.equal('hello world')
 
-    // 7bit safe charactes will be compressed
-    expect(output1.result().length).to.equalLE('hello world'.length)
+    // uint32 bytes + string length * 2
+    expect(output.result().length).to.equal(('hello world'.length << 1) + 4)
 
-    let output2 = new BinaryOutput()
-    output2.dumpString('')
-    expect(output2.result().length).to.equal(''.length + 1)
+    output = new BinaryOutput()
+    output.dumpString('')
+    expect(output.result().length).to.equal(4)
 
-    // 7bit unsafe charactes will not be compressed
-    let output3 = new BinaryOutput()
-    output3.dumpString('\u1111\u1111')
-    expect(output3.result().length).to.equal('\u1111\u1111'.length + 1)
+    output = new BinaryOutput()
+    output.dumpString('\u1111\u1111')
+    expect(output.result().length).to.equal(('\u1111\u1111'.length << 1) + 4)
+
+    output = new BinaryOutput()
+    output.dumpString('\u1111\u1111')
+    expect(output.result().length).to.equal(('\u1111\u1111'.length << 1) + 4)
+
+    output = new BinaryOutput()
+    output.dumpString('hello world', true)
+    expect(output.result().length).to.equal('hello world'.length + 4)
   })
 
   it('test_string_list', function () {

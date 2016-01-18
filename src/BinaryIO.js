@@ -1,3 +1,4 @@
+'use strict'
 
 export class BinaryIO {
   static boolToBit (val) {
@@ -5,7 +6,7 @@ export class BinaryIO {
   }
 
   static stringToBinaryBuffer (str, buffer = null) {
-    let newBuffer = buffer = new Uint8Array(str.length << 1)
+    let newBuffer = buffer || new Uint8Array(str.length << 1)
     for (let i = 0; i < str.length; ++i) {
       let charCode = str.charCodeAt(i)
       let pos = i << 1
@@ -183,7 +184,7 @@ export class BinaryBuffer {
 
   dumpStringMap (strMap, isBinary = false) {
     let isMap = strMap instanceof Map
-    let entries
+    let entries = []
     if (isMap) {
       entries = strMap.entries()
     } else {
@@ -192,9 +193,13 @@ export class BinaryBuffer {
     let strList = []
     for (let [key, val] of entries) {
       strList.push(key)
-      strList.push(val)
+      strList.push(JSON.stringify(val))
     }
     this.dumpStringList(strList, isBinary, isMap)
+  }
+
+  dumpStringListMap (strMap, isBinary = false) {
+    return this.dumpStringMap(strMap, isBinary)
   }
 
   loadString (options = {}) {
@@ -227,6 +232,9 @@ export class BinaryBuffer {
 
   loadStringMap (options = {}) {
     let list = this.loadStringList(options)
+    for (let i = 1; i < list.length; i += 2) {
+      list[i] = JSON.parse(list[i])
+    }
     let map
     if (options.isMap) {
       map = new Map()
@@ -240,6 +248,10 @@ export class BinaryBuffer {
       }
       return map
     }
+  }
+
+  loadStringListMap (options = {}) {
+    return this.loadStringMap(options)
   }
 }
 
