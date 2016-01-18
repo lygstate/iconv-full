@@ -1,7 +1,11 @@
 
 export class BinaryIO {
-  static stringToBinaryBuffer (str) {
-    let newBuffer = new Uint8Array(str.length << 1)
+  static boolToBit (val) {
+    return val === false ? 0 : 1
+  }
+
+  static stringToBinaryBuffer (str, buffer = null) {
+    let newBuffer = buffer = new Uint8Array(str.length << 1)
     for (let i = 0; i < str.length; ++i) {
       let charCode = str.charCodeAt(i)
       let pos = i << 1
@@ -11,17 +15,36 @@ export class BinaryIO {
     return newBuffer
   }
 
-  static stringBinaryToBinaryBuffer (str) {
-    let newBuffer = new Uint8Array(str.length)
+  static binaryBufferToString (buffer) {
+    let length = buffer.byteLength >> 1
+    let str = ''
+    for (let i = 0; i < length; ++i) {
+      let pos = i << 1
+      str += String.fromCharCode(buffer[pos] << 8 | (buffer[pos + 1]))
+    }
+    return str
+  }
+
+  static stringBinaryToBinaryBuffer (str, buffer = null) {
+    let newBuffer = buffer || new Uint8Array(str.length)
     for (let i = 0; i < str.length; ++i) {
       newBuffer[i] = str.charCodeAt(i)
     }
     return newBuffer
   }
 
+  static binaryBufferToStringBinary (buffer) {
+    let length = buffer.byteLength >> 1
+    let str = ''
+    for (let i = 0; i < length; ++i) {
+      str += String.fromCharCode(buffer[i])
+    }
+    return str
+  }
+
   static createBinaryBuffer (buffer, bufferWidth = null) {
     if (buffer && buffer.buffer instanceof ArrayBuffer) {
-      return new Uint8Array(buffer.buffer)
+      return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)
     }
     if (typeof buffer === 'string') {
       if (bufferWidth === 8) {
@@ -64,38 +87,41 @@ export class BinaryBuffer {
   }
 
   set length (newLength) {
-    if (newLength >= this.capacity) {
+    if (newLength > this.capacity) {
       let oldBuffer = this._buffer
       // TODO: make sure the size be the power of 2
       this._buffer = new Uint8Array(newLength << 1)
       this._buffer.copyWithin(oldBuffer, 0, this._length)
-      this._dataView = new DataView(this._buffer)
+      this._dataView = new DataView(this._buffer.buffer)
     }
     this._length = newLength
   }
 
   getUint32 (offset) {
-    this._dataView.getUint32(offset)
+    return this._dataView.getUint32(offset)
   }
 
   getUint16 (offset) {
-    this._dataView.getUint16(offset)
+    return this._dataView.getUint16(offset)
   }
 
   getUint8 (offset) {
-    this._dataView.getUint8(offset)
+    return this._dataView.getUint8(offset)
   }
 
   setUint32 (offset, val) {
     this._dataView.setUint32(offset, val)
+    return val
   }
 
   setUint16 (offset, val) {
     this._dataView.setUint16(offset, val)
+    return val
   }
 
   setUint8 (offset, val) {
     this._dataView.setUint8(offset, val)
+    return val
   }
 
   dump32bitNumber (val) {
@@ -107,13 +133,13 @@ export class BinaryBuffer {
   dump16bitNumber (val) {
     let offset = this.length
     this.length += 2
-    this.setUint16(offset, val)
+    return this.setUint16(offset, val)
   }
 
   dump8bitNumber (val) {
     let offset = this.length
     this.length += 1
-    this.setUint8(offset, val)
+    return this.setUint8(offset, val)
   }
 
   load32bitNumber () {
@@ -133,6 +159,88 @@ export class BinaryBuffer {
     this.length += 1
     return val
   }
+
+  dumpString (str, isBinary = false) {
+    let stringInfo = (str.length << 1) | BinaryIO.boolToBit(isBinary)
+    this.dump32bitNumber(stringInfo)
+    let offset = this.length
+    if (isBinary) {
+      this.length += str.length
+      BinaryIO.stringBinaryToBinaryBuffer(str, this._buffer.subarray(offset))
+    } else {
+      this.length += (str.length << 1)
+      BinaryIO.stringToBinaryBuffer(str, this._buffer.subarray(offset))
+    }
+  }
+
+  dumpStringList (strList, isBinary = false, isMap = false) {
+    let listInfo = (strList.length << 1) | BinaryIO.boolToBit(isBinary)
+    this.dump32bitNumber(listInfo)
+    for (let str of strList) {
+      this.dumpString(str, isBinary)
+    }
+  }
+
+  dumpStringMap (strMap, isBinary = false) {
+    let isMap = strMap instanceof Map
+    let entries
+    if (isMap) {
+      entries = strMap.entries()
+    } else {
+      entries = Object.entries(strMap)
+    }
+    let strList = []
+    for (let [key, val] of entries) {
+      strList.push(key)
+      strList.push(val)
+    }
+    this.dumpStringList(strList, isBinary, isMap)
+  }
+
+  loadString (options = {}) {
+    const stringInfo = this.load32bitNumber()
+    const strLength = stringInfo >> 1
+    options.isBinary = (stringInfo & 1) === 1
+    let offset = this.length
+    let str
+    if (options.isBinary) {
+      this.length += strLength
+      str = BinaryIO.binaryBufferToStringBinary(this._buffer.subarray(offset, offset + strLength))
+    } else {
+      const bufferLength = strLength << 1
+      this.length += bufferLength
+      str = BinaryIO.binaryBufferToString(this._buffer.subarray(offset, offset + bufferLength))
+    }
+    return str
+  }
+
+  loadStringList (options = {}) {
+    const listInfo = this.load32bitNumber()
+    const listLength = listInfo >> 1
+    options.isMap = (listInfo & 1) === 1
+    let list = []
+    for (let i = 0; i < listLength; ++i) {
+      list.push(this.loadString(options))
+    }
+    return list
+  }
+
+  loadStringMap (options = {}) {
+    let list = this.loadStringList(options)
+    let map
+    if (options.isMap) {
+      map = new Map()
+      for (let i = 0; i < list.length; i += 2) {
+        map.set(list[i], list[i + 1])
+      }
+    } else {
+      map = {}
+      for (let i = 0; i < list.length; i += 2) {
+        map[list[i]] = list[i + 1]
+      }
+      return map
+    }
+  }
 }
 
 export class BinaryInput extends BinaryBuffer {
@@ -142,8 +250,8 @@ export class BinaryInput extends BinaryBuffer {
 
   load32bitNumberList () {
     const resultLength = this.load32bitNumber()
-    const resultList = new Uint32Array(this._buffer.subarray(this._offset).buffer, resultList)
-    this._offset += resultLength << 2
+    const resultList = new Uint32Array(this._buffer.subarray(this.length).buffer, resultList)
+    this.length += resultLength << 2
     return resultList
   }
 }
