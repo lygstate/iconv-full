@@ -5,11 +5,7 @@ const assert = require('assert')
 import { BinaryIO, BinaryInput, BinaryOutput } from '../src/BinaryIO'
 
 describe('testing BinaryIO', function () {
-  // http://www.fmddlmyy.cn/text30.html
-
-  // Unicode、GB2312、GBK和GB18030中的汉字
-  // http://www.fmddlmyy.cn/text24.html
-  it('test BinaryIO constructor pua decode', function () {
+  it('test constructor', function () {
     let buffer = BinaryIO.stringToBinaryBuffer('\u0000\u0001')
     assert.equal(buffer.length, 4)
     expect(buffer.toString()).to.equal('0,0,0,1')
