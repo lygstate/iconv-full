@@ -78,7 +78,7 @@ async.parallel({
   big5.push([toIdxBig5(1166), 0x00EA << 16 | 0x030C])
   //  TODO: Check the cp950 big5 difference
 
-  utils.writeTable('big5', utils.generateTable(big5))
+  utils.generateTable('big5', big5)
   // utils.writeTable('cp950', utils.generateTable(data.cp950))
 
   // Calculate difference between GB18030 encoding and cp936.
@@ -88,7 +88,7 @@ async.parallel({
   exports.convertWhatWgTable(data.$gbk, gbk, toIdxGBK)
   // TODO: Compare GBK & cp936
   // utils.writeTable('cp936', utils.generateTable(data.cp936))
-  utils.writeTable('gbk', utils.generateTable(gbk))
+  utils.generateTable('gbk', gbk)
 
   // Write GB18030 ranges
   let ranges = { uChars: [], gbChars: [] }
@@ -98,14 +98,14 @@ async.parallel({
   }
   utils.writeFile('gb18030-ranges', JSON.stringify(ranges))
 
-  utils.writeTable('jis0208', utils.generateTable(data.$jis0208))
-  utils.writeTable('jis0212', utils.generateTable(data.$jis0212))
+  utils.generateTable('jis0208', data.$jis0208)
+  utils.generateTable('jis0212', data.$jis0212)
 
   // Fill out EUC-KR Table and check that it is the same as cp949.
   let eucKr = initDBCS()
   exports.convertWhatWgTable(data.$eucKr, eucKr, toIdxKR)
   // TODO: Compare CP949 eucKr
 
-  utils.writeTable('euc-kr', utils.generateTable(eucKr))
+  utils.generateTable('euc-kr', eucKr)
   console.log('DBCS encodings regenerated.')
 }))

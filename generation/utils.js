@@ -99,10 +99,11 @@ exports.compressArray = (array) => {
     ++pos
   }
   offsets.push(array.length)
-  return [
-    [results.length, results],
-    [offsets.length, offsets]
-  ]
+  return {
+    length: results.length,
+    results: results,
+    offset: offsets
+  }
 }
 
 exports.mapToPermutation = (map) => {
@@ -112,22 +113,13 @@ exports.mapToPermutation = (map) => {
   for (let key of keys.array) {
     permutation.push([keys.poses[key], values.poses[map.get(key)]])
   }
-  let keysCompressed = exports.compressArray(keys.array)
-  let valuesCompressed = exports.compressArray(values.array)
-  let count = 0
-  for (let v of valuesCompressed[0][1]) {
-    if (v <= 0xFFFF) {
-      count += 1
-    }
+  return {
+    length: permutation.length,
+    permutation: permutation,
+    keys: exports.compressArray(keys.array),
+    narrowUnicodes: exports.compressArray(values.array.filter((x) => x <= 0xFFFF)),
+    wideUnicodes: exports.compressArray(values.array.filter((x) => x > 0xFFFF))
   }
-  return [
-    {
-      length: permutation.length,
-      narrowUnicodeCount: count,
-      unicodeCount: valuesCompressed[0][1].length,
-      wideUnicodeCount: valuesCompressed[0][1].length - count
-    }
-  ].concat(keysCompressed, valuesCompressed, [permutation])
 }
 
 // Input: map <dbcs num> -> <unicode num>
@@ -135,33 +127,50 @@ exports.mapToPermutation = (map) => {
 // [0] = address of start of the chunk, hex string.
 // <str> - characters of the chunk.
 // <num> - increasing sequence of the length num, starting with prev character.
-exports.generateTable = function (dbcs) {
-  let cacheKey = new Set()
-  let cacheValue = new Set()
-  let map = new Map()
-  let rest = []
-  for (let [key, value] of dbcs) {
-    if (cacheKey.has(key) || cacheValue.has(value)) {
-      if (map.has(key)) {
-        console.log('Repeat key', map.get(key) === value)
+exports.generateTable = function (name, dbcs) {
+  let tables = []
+  let totalSize = 0
+  while (dbcs.length > 0) {
+    let cacheKey = new Set()
+    let cacheValue = new Set()
+    let map = new Map()
+    let rest = []
+    for (let [key, value] of dbcs) {
+      if (cacheKey.has(key) || cacheValue.has(value)) {
+        if (map.has(key)) {
+          console.log('Repeat key', map.get(key) === value)
+        }
+        rest.push([key, value])
+        continue
       }
-      rest.push([key, value])
-      continue
+      cacheKey.add(key)
+      cacheValue.add(value)
+      map.set(key, value)
     }
-    cacheKey.add(key)
-    cacheValue.add(value)
-    map.set(key, value)
+    let permutation = exports.mapToPermutation(map)
+    permutation.size = permutation.length * 2 + (permutation.keys.length * 4 + 2) +
+      (permutation.narrowUnicodes.length * 4 + 2) + (permutation.wideUnicodes.length * 6 + 2)
+    // console.log(`permutation: ${permutation.size} ${permutation.narrowUnicodes.length} ${permutation.wideUnicodes.length}`)
+    tables.push(permutation)
+    totalSize += permutation.size
+    dbcs = rest
   }
-  // console.log(rest)
-  let table = exports.mapToPermutation(map)
-  let totalByte = table[0].length * 2 + table[0].wideUnicodeCount * 2 + (table[1][0] * 4 + 2) + (table[2][0] * 4 + 2)
-  console.log(`Expected talbe size is ${totalByte}`)
-  // console.log(table)
-  return [totalByte].concat([rest.length, rest], table)
+  console.log(`Need space for ${name} is ${totalSize} Bytes, table count: ${tables.length}`)
+  exports.writeTable(name, tables)
+  return tables
 }
 
 exports.writeTable = function (name, table) {
-  this.writeFile(name, '[\n' + table.map(function (a) { return JSON.stringify(a) }).join(',\n') + '\n]\n')
+  function replacer (key, value) {
+    if (value === table) {
+      return value
+    }
+    if (Array.isArray(value)) {
+      return JSON.stringify(value)
+    }
+    return value
+  }
+  this.writeFile(name, JSON.stringify(table, replacer, 2))
 }
 
 exports.writeFile = function (name, body) {
