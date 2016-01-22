@@ -1,18 +1,45 @@
-// import { FMIndex } from 'fm-index'
+'use strict'
 
 const utils = require('./utils')
 const errTo = require('errto')
 const async = require('async')
 
-function initDBCS (from) {
-  let to = {}
-  for (let i = 0; i <= 0x80; ++i) {
-    if (from[i] === undefined) {
-      continue
-    }
-    to[i] = from[i]
+function initDBCS (last) {
+  last = last || 0x7f
+  let to = []
+  for (let i = 0; i <= last; ++i) {
+    to.push([i, i])
   }
   return to
+}
+
+// Add char sequences that are not in the index file (as given in http://encoding.spec.whatwg.org/#big5-encoder)
+function toIdxBig5 (pointer) {
+  let lead = Math.floor(pointer / 157) + 0x81  // Lead byte is 0x81 .. 0xFE
+  let trail = pointer % 157
+  let offset = trail < 0x3F ? 0x40 : 0x62
+  return (lead << 8) | (trail + offset)
+}
+
+function toIdxGBK (pointer) {
+  let lead = Math.floor(pointer / 190) + 0x81
+  let trail = pointer % 190
+  let offset = trail < 0x3F ? 0x40 : 0x41
+  return (lead << 8) | (trail + offset)
+}
+
+function toIdxKR (pointer) {
+  let lead = Math.floor(pointer / 190) + 0x81
+  let trail = pointer % 190
+  let offset = 0x41
+  return (lead << 8) | (trail + offset)
+}
+
+exports.convertWhatWgTable = (table, target, toIdx) => {
+  for (let [pointer, unicode] of table) {
+    let idx = toIdx(pointer)
+    target.push([idx, unicode])
+  }
 }
 
 async.parallel({
@@ -29,83 +56,46 @@ async.parallel({
 }, errTo(console.log, function (data) {
   // First, parse all files.
   for (let enc in data) {
-    let dbcs = {}
+    let isJIS = enc.startsWith('$jis')
+    let dbcs = []
+    if (isJIS) {
+      dbcs = {}
+    }
     let parseIntBase = enc.startsWith('$') ? 10 : 16
     utils.parseText(data[enc]).map(function (a) {
       let dbcsCode = parseInt(a[0], parseIntBase)
       let unicode = parseInt(a[1], 16)
       if (!isNaN(unicode)) {
-        dbcs[dbcsCode] = unicode
+        if (isJIS) {
+          dbcs[dbcsCode] = unicode
+        } else {
+          dbcs.push([dbcsCode, unicode])
+        }
       }
     })
     data[enc] = dbcs
   }
 
-  // Add char sequences that are not in the index file (as given in http://encoding.spec.whatwg.org/#big5-encoder)
-  function toIdx (pointer) {
-    let trail = pointer % 157
-    let lead = Math.floor(pointer / 157) + 0x81
-    return (lead << 8) + (trail + (trail < 0x3F ? 0x40 : 0x62))
-  }
-
   // Calculate difference between big5 and cp950, and write it to a file.
   // See http://encoding.spec.whatwg.org/#big5-encoder
-  let big5 = initDBCS(data.cp950)
+  let big5 = initDBCS()
+  exports.convertWhatWgTable(data.$big5, big5, toIdxBig5)
+  big5.push([toIdxBig5(1133), 0x00CA << 16 | 0x0304])
+  big5.push([toIdxBig5(1135), 0x00CA << 16 | 0x030C])
+  big5.push([toIdxBig5(1164), 0x00EA << 16 | 0x0304])
+  big5.push([toIdxBig5(1166), 0x00EA << 16 | 0x030C])
+  //  TODO: Check the cp950 big5 difference
 
-  for (let i of utils.sortedIntegerArray(Object.keys(data.$big5))) { // Lead byte is 0x81 .. 0xFE
-    let idx = toIdx(i)
-    let big5Char = data.$big5[i]
-    big5[idx] = big5Char
-    let cpChar = data.cp950[idx]
-    if (cpChar !== undefined && cpChar !== big5Char) {
-      // https://lists.w3.org/Archives/Public/public-whatwg-archive/2012Apr/0095.html
-      /*
-      F9FE =>
-       opera-hk: U+FFED ?
-        firefox: U+2593 ?
-        chrome: U+2593 ?
-        firefox-hk: U+2593 ?
-        opera: U+2593 ?
-        chrome-hk: U+FFED ?
-        internetexplorer: U+2593 ?
-        hkscs-2008: <U+FFED> ?
-      */
-      console.log('Big5 dont match: ', i.toString(16), idx.toString(16), big5Char.toString(16), cpChar.toString(16))
-    }
-  }
-
-  big5[toIdx(1133)] = [0x00CA, 0x0304]
-  big5[toIdx(1135)] = [0x00CA, 0x030C]
-  big5[toIdx(1164)] = [0x00EA, 0x0304]
-  big5[toIdx(1166)] = [0x00EA, 0x030C]
-
-  utils.writeTable('cp950', utils.generateTable(data.cp950))
   utils.writeTable('big5', utils.generateTable(big5))
+  // utils.writeTable('cp950', utils.generateTable(data.cp950))
 
   // Calculate difference between GB18030 encoding and cp936.
   // See http://encoding.spec.whatwg.org/#gb18030-encoder
-  let gbk = initDBCS(data.cp936)
-  for (let i = 0x8100; i < 0x10000; i++) { // Lead byte is 0x81 .. 0xFE
-    let trail = i & 0xFF
-    if (trail < 0x40 || trail === 0x7F || trail > 0xFE) continue
-    let lead = i >> 8
-    let offset = (trail < 0x7F) ? 0x40 : 0x41
-    let gbAddr = (lead - 0x81) * 190 + (trail - offset)
-    let cpChar = data.cp936[i]
-    let gbChar = data.$gbk[gbAddr]
-    if (gbChar === undefined) {
-      if (cpChar !== undefined) {
-        console.log('Dont match: ', i.toString(16), gbAddr.toString(16), gbChar, cpChar)
-      }
-      continue
-    }
-    if ((cpChar !== undefined) && (cpChar !== gbChar)) {
-      console.log('Dont match: ', i.toString(16), gbAddr.toString(16), gbChar, cpChar)
-    }
-    gbk[i] = gbChar
-  }
-
-  utils.writeTable('cp936', utils.generateTable(data.cp936))
+  let gbk = initDBCS()
+  gbk.push([0x80, '€'.charCodeAt(0)]) // 0x80 is the Euro dollor symbol
+  exports.convertWhatWgTable(data.$gbk, gbk, toIdxGBK)
+  // TODO: Compare GBK & cp936
+  // utils.writeTable('cp936', utils.generateTable(data.cp936))
   utils.writeTable('gbk', utils.generateTable(gbk))
 
   // Write GB18030 ranges
@@ -117,12 +107,9 @@ async.parallel({
   utils.writeFile('gb18030-ranges', JSON.stringify(ranges))
 
   // Use http://encoding.spec.whatwg.org/#shift_jis-decoder
-  let shiftjis = {}
-  for (let i = 0; i <= 0x80; i++) {
-    shiftjis[i] = i
-  }
+  let shiftjis = initDBCS(0x80)
   for (let i = 0xA1; i <= 0xDF; i++) {
-    shiftjis[i] = 0xFF61 + i - 0xA1
+    shiftjis.push([i, 0xFF61 + i - 0xA1])
   }
 
   for (let lead = 0x81; lead < 0xFF; lead++) {
@@ -133,9 +120,9 @@ async.parallel({
         if ((byte >= 0x40 && byte <= 0x7E) || (byte >= 0x80 && byte <= 0xFC)) {
           let pointer = (lead - leadOffset) * 188 + byte - offset
           if (data.$jis0208[pointer]) {
-            shiftjis[(lead << 8) + byte] = data.$jis0208[pointer]
+            shiftjis.push([(lead << 8) + byte, data.$jis0208[pointer]])
           } else if (pointer >= 8836 && pointer <= 10528) {
-            shiftjis[(lead << 8) + byte] = 0xE000 + pointer - 8836 // Interoperable legacy from Windows known as EUDC
+            shiftjis.push([(lead << 8) + byte, 0xE000 + pointer - 8836]) // Interoperable legacy from Windows known as EUDC
           }
         }
       }
@@ -145,12 +132,9 @@ async.parallel({
   utils.writeTable('shiftjis', utils.generateTable(shiftjis))
 
   // Fill out EUC-JP table according to http://encoding.spec.whatwg.org/#euc-jp
-  let eucJp = {}
-  for (let i = 0; i < 0x80; i++) {
-    eucJp[i] = i
-  }
+  let eucJp = initDBCS()
   for (let i = 0xA1; i <= 0xDF; i++) {
-    eucJp[(0x8E << 8) + i] = 0xFF61 + i - 0xA1
+    eucJp.push([(0x8E << 8) + i, 0xFF61 + i - 0xA1])
   }
   for (let i = 0xA1; i <= 0xFE; i++) {
     for (let j = 0xA1; j <= 0xFE; j++) {
@@ -161,40 +145,18 @@ async.parallel({
       if (jis0208Char && jis0212Char) {
         // console.log('Exist in both index')
       }
-      if (jis0208Char) eucJp[(i << 8) + j] = jis0208Char
-      if (jis0212Char) eucJp[(0x8F << 16) + (i << 8) + j] = jis0212Char
+      if (jis0208Char) eucJp.push([(i << 8) + j, jis0208Char])
+      if (jis0212Char) eucJp.push([(0x8F << 16) + (i << 8) + j, jis0212Char])
     }
   }
 
   utils.writeTable('eucjp', utils.generateTable(eucJp))
 
   // Fill out EUC-KR Table and check that it is the same as cp949.
-  let eucKr = {}
-  for (let i = 0; i < 0x80; i++) {
-    eucKr[i] = i
-  }
-  for (let i = 0x8100; i < 0xFF00; i++) {
-    let lead = i >> 8
-    let byte = i & 0xFF
-    let pointer = null
-    if (byte >= 0x41 && byte <= 0xFE) {
-      pointer = (lead - 0x81) * 190 + (byte - 0x41)
-    }
-    if (pointer !== null) {
-      eucKr[i] = data.$eucKr[pointer]
-    }
+  let eucKr = initDBCS()
+  exports.convertWhatWgTable(data.$eucKr, eucKr, toIdxKR)
+  // TODO: Compare CP949 eucKr
 
-    // Compare with cp949
-    if (data.cp949[i] !== eucKr[i]) {
-      console.log(byte, pointer)
-      console.log("Warning: EUC-KR from Encoding Standard doesn't match with CP949 from Unicode.com: ", i, data.cp949[i], eucKr[i])
-    }
-  }
-
-  // Write all plain tables as-is.
-  for (let enc of ['cp949']) {
-    utils.writeTable(enc, utils.generateTable(data[enc]))
-  }
-
+  utils.writeTable('euc-kr', utils.generateTable(eucKr))
   console.log('DBCS encodings regenerated.')
 }))

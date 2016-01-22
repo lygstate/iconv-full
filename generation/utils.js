@@ -2,7 +2,6 @@ let fs = require('fs-extra')
 let request = require('request')
 let path = require('path')
 let errTo = require('errto')
-import { FMIndex, BinaryOutput } from 'fm-index'
 
 // Common utilities used in scripts.
 
@@ -32,14 +31,14 @@ exports.parseText = function (text, splitChar) {
 // so we emit surrogates when needed. Also, some character codes are actually
 // sequences (arrays) - we emit them prepended with U+0FFF-(length-2).
 // U+0FFF was chosen because it's small and unassigned, as well as 32 chars before it
-function arrToStr (arr) {
+exports.arrToStr = (arr) => {
   let s = ''
   for (let i = 0; i < arr.length; i++) {
     if (Array.isArray(arr[i])) {
       if (arr[i].length === 1) {
-        s += arrToStr(arr[i])
+        s += exports.arrToStr(arr[i])
       } else if (arr[i].length > 1) {
-        s += String.fromCharCode(0xFFF - (arr[i].length - 2)) + arrToStr(arr[i])
+        s += String.fromCharCode(0xFFF - (arr[i].length - 2)) + exports.arrToStr(arr[i])
       }
     } else if (arr[i] > 0xFFFF) {
       // Surrogates
@@ -73,102 +72,92 @@ exports.bufferToIntArray = (buffer) => {
   return data
 }
 
+exports.arrayToSortedMap = (arr) => {
+  arr = exports.sortedIntegerArray(Array.from(arr))
+  let valuesPos = {}
+  for (let i = 0; i < arr.length; ++i) {
+    valuesPos[arr[i]] = i
+  }
+
+  return {
+    array: arr,
+    poses: valuesPos
+  }
+}
+
+exports.compressArray = (array) => {
+  let prev = -2
+  let offsets = []
+  let results = []
+  let pos = 0
+  for (let item of array) {
+    if (prev + 1 !== item) {
+      offsets.push(pos)
+      results.push(item)
+    }
+    prev = item
+    ++pos
+  }
+  offsets.push(array.length)
+  return [
+    [results.length, results],
+    [offsets.length, offsets]
+  ]
+}
+
+exports.mapToPermutation = (map) => {
+  let keys = exports.arrayToSortedMap(map.keys())
+  let values = exports.arrayToSortedMap(map.values())
+  let permutation = []
+  for (let key of keys.array) {
+    permutation.push([keys.poses[key], values.poses[map.get(key)]])
+  }
+  let keysCompressed = exports.compressArray(keys.array)
+  let valuesCompressed = exports.compressArray(values.array)
+  let count = 0
+  for (let v of valuesCompressed[0][1]) {
+    if (v <= 0xFFFF) {
+      count += 1
+    }
+  }
+  return [
+    {
+      length: permutation.length,
+      narrowUnicodeCount: count,
+      unicodeCount: valuesCompressed[0][1].length,
+      wideUnicodeCount: valuesCompressed[0][1].length - count
+    }
+  ].concat(keysCompressed, valuesCompressed, [permutation])
+}
+
 // Input: map <dbcs num> -> <unicode num>
 // Resulting format: Array of chunks, each chunk is:
 // [0] = address of start of the chunk, hex string.
 // <str> - characters of the chunk.
 // <num> - increasing sequence of the length num, starting with prev character.
 exports.generateTable = function (dbcs) {
-  // Do not record the sequence length, cause that
-  // doesn't save space much
-  let table = []
-  let singleString = ''
-  let dbcsOffsets = []
-  let charLengths = []
-  let unicodeOffsets = []
-  let charLength = 0
-  let offset = 0
-  let prevIndex = -2
-  let stringList = {}
-  for (let i of exports.sortedIntegerArray(Object.keys(dbcs))) {
-    const char = arrToStr([dbcs[i]])
-
-    const charString = new Buffer(char, 'utf8').toString('binary')
-    if (charString.length === 1 && charString[0].charCodeAt(0) < 0x80) {
+  let cacheKey = new Set()
+  let cacheValue = new Set()
+  let map = new Map()
+  let rest = []
+  for (let [key, value] of dbcs) {
+    if (cacheKey.has(key) || cacheValue.has(value)) {
+      if (map.has(key)) {
+        console.log('Repeat key', map.get(key) === value)
+      }
+      rest.push([key, value])
       continue
     }
-    for (let i = 0; i < charString.length; ++i) {
-      if (charString[0].charCodeAt(0) === 0) {
-        console.log('Warning, no zero')
-      }
-    }
-
-    if (!(charString in stringList)) {
-      stringList[charString] = []
-    }
-    stringList[charString].push(singleString.length)
-    singleString += charString
-    if (prevIndex + 1 !== i || charLength !== charString.length) { // Range started.
-      charLength = charString.length
-      dbcsOffsets.push(i)
-      charLengths.push(charLength)
-      unicodeOffsets.push(offset)
-    }
-    offset += 1
-    prevIndex = i
+    cacheKey.add(key)
+    cacheValue.add(value)
+    map.set(key, value)
   }
-  unicodeOffsets.push(offset)
-  let maxCharCode = 1
-  for (let i = 0; i < singleString.length; ++i) {
-    if (singleString.charCodeAt(i) > maxCharCode) {
-      maxCharCode = singleString.charCodeAt(i)
-    }
-  }
-  // if ((maxCharCode & 1) === 1) maxCharCode += 1
-
-  // FIXME: TODO: FMIndex issue: when a single char repeat
-  // mutliple times, it's dead lock
-  // TODO: FIXME: FMIndex doesn't support for 0 in string
-  let fm = new FMIndex()
-  fm.push(singleString)
-  fm.build(5, 0xFF)
-
-  let dump = new BinaryOutput()
-  fm.dump(dump)
-  let result = dump.result()
-  exports.totalLength += result.length
-  exports.totalLength += dbcsOffsets.length * 4
-  exports.totalLength += charLengths.length
-  exports.totalLength += unicodeOffsets.length * 4
-  console.log(`maxCharCode: ${maxCharCode} fm size:${fm.size()} contentSize:${fm.contentSize()} utf8 length:${singleString.length}`)
-  console.log(`currentLength:${result.length} totalLength:${exports.totalLength}`)
-
-  table.push(dbcsOffsets)
-  table.push(charLengths)
-  table.push(unicodeOffsets)
-  table.push(exports.bufferToIntArray(new Buffer(result, 'binary')))
-
-  let begin = Date.now()
-  let matched = 0
-  for (let charString in stringList) {
-    let poses = exports.sortedIntegerArray(stringList[charString])
-    let chars = exports.bufferToIntArray(new Buffer(charString, 'binary'))
-    let serachedPoses = exports.sortedIntegerArray(fm.search(charString))
-    if (poses.toString() !== serachedPoses.toString()) {
-      console.log(`${chars.toString()} search not match ${poses.toString()} ${serachedPoses.toString()} matched:${matched}`)
-    } else {
-      ++matched
-    }
-  }
-  console.log(`The time search is: ${Date.now() - begin}`)
-  begin = Date.now()
-  for (let pos = 0; pos < singleString.length; ++pos) {
-    if (fm.getSubstring(pos, 1).charCodeAt(0) !== singleString.charCodeAt(pos)) {
-      console.log(singleString.charCodeAt(pos))
-    }
-  }
-  console.log(`The time getPosition is: ${Date.now() - begin}`)
-  return table
+  // console.log(rest)
+  let table = exports.mapToPermutation(map)
+  let totalByte = table[0].length * 2 + table[0].wideUnicodeCount * 2 + (table[1][0] * 4 + 2) + (table[2][0] * 4 + 2)
+  console.log(`Expected talbe size is ${totalByte}`)
+  // console.log(table)
+  return [totalByte].concat([rest.length, rest], table)
 }
 
 exports.writeTable = function (name, table) {
