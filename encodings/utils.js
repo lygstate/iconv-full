@@ -7,9 +7,10 @@ exports.convertCompressedArray = (compressed) => {
   compressed.extraPlane = new Uint32Array(compressed.extraPlane)
   compressed.planeOffsets = new Uint16Array(compressed.planeOffsets)
 }
+
 // Search between [start, end)
 // The array[result] <= element < array[result + 1]
-exports.BinarySearch = (array, left, right, element) => {
+const BinarySearch = exports.BinarySearch = (array, left, right, element) => {
   left = left - 1
   while (left + 1 < right) {
     let mid = (left + right) >> 1
@@ -22,8 +23,25 @@ exports.BinarySearch = (array, left, right, element) => {
   return left
 }
 
-exports.indexOfCodePointInPlane = (plane, left, right, codepoint, offsets) => {
-  let offsetPos = exports.BinarySearch(plane, left, right, codepoint)
+exports.indexOfCodePoint = (compressed, codepoint) => {
+  let left = 0
+  let right = compressed.extraPlane.length
+  let plane = compressed.extraPlane
+  let extraOffset = compressed.extraStart
+  let offsets = compressed.extraOffsets
+
+  if (codepoint < UNICODE_MAX_CODEPOINT) {
+    let planeNumber = codepoint >> 16
+    // console.log(compressed.planeOffsets)
+    left = compressed.planeOffsets[planeNumber]
+    right = compressed.planeOffsets[planeNumber + 1]
+    plane = compressed.planes
+    offsets = compressed.offsets
+    codepoint = codepoint & 0xFFFF
+    extraOffset = 0
+  }
+
+  let offsetPos = BinarySearch(plane, left, right, codepoint)
   // console.log(plane, left, right, pos, codepoint)
   if (offsetPos < left) {
     return -1
@@ -35,29 +53,7 @@ exports.indexOfCodePointInPlane = (plane, left, right, codepoint, offsets) => {
   if (finalOffset >= maxOffset) {
     return -1
   }
-  return finalOffset
-}
-
-exports.indexOfCodePoint = (compressed, codepoint) => {
-  if (codepoint < UNICODE_MAX_CODEPOINT) {
-    let planeNumber = codepoint >> 16
-    // console.log(compressed.planeOffsets)
-    let left = compressed.planeOffsets[planeNumber]
-    let right = compressed.planeOffsets[planeNumber + 1]
-    return exports.indexOfCodePointInPlane(
-      compressed.planes,
-      left, right,
-      codepoint & 0xFFFF, compressed.offsets)
-  }
-
-  let finalPos = exports.indexOfCodePointInPlane(
-    compressed.extraPlane,
-    0, compressed.extraPlane.length,
-    codepoint, compressed.extraOffsets)
-  if (finalPos === -1) {
-    return -1
-  }
-  return compressed.extraStart + finalPos
+  return finalOffset + extraOffset
 }
 
 exports.codePointOfIndex = (compressed, index) => {
