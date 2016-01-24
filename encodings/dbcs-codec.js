@@ -52,6 +52,7 @@ DBCSEncoder.prototype.write = function (str) {
   let j = 0
   let nextChar = -1
   let uCode = 0
+  let mappingTables = this.mappingTables
   while (true) {
     // 0. Get next character.
     if (nextChar === -1) {
@@ -95,7 +96,7 @@ DBCSEncoder.prototype.write = function (str) {
       if (uCode < 0x80) {
         dbcsCode = uCode
       } else {
-        for (let table of this.mappingTables) {
+        for (let table of mappingTables) {
           let index = table.unicodes.indexOfCodePoint(uCode)
           if (index >= 0) {
             index = table.unicodeToPointers[index]
@@ -127,6 +128,7 @@ DBCSEncoder.prototype.write = function (str) {
 }
 
 DBCSEncoder.prototype.end = function () {
+  this.leadSurrogate = -1
 }
 
 // == Decoder ==================================================================
@@ -137,6 +139,7 @@ function DBCSDecoder (options, codec) {
 
   // Static data
   this.mappingTables = codec.mappingTables
+  this.table = this.mappingTables[0]
   this.defaultCharUnicode = codec.defaultCharUnicode
   this.defaultCharUnicodeCode = codec.defaultCharUnicode.charCodeAt(0)
   this.gb18030 = codec.gb18030
@@ -146,15 +149,16 @@ DBCSDecoder.prototype.write = function (buf) {
   const newBuf = new Buffer(buf.length * 2)
   let uCode = 0
   let prevByte = this.prevByte
-  let dbcsCode = this.dbcsCode
+  let mappingTables = this.mappingTables
+  // let dbcsCode = this.dbcsCode
 
   let j = 0
-  for (let i = 0; i < buf.length; i++) {
+  for (let i = 0; i < buf.length; ++i) {
     const curByte = buf[i]
     let pointer = 0
     if (prevByte === GB18030_CODE) {
       // DO GB18030 decode
-      dbcsCode = dbcsCode * 2
+      // dbcsCode = dbcsCode * 2
     } else if (prevByte === 0) {
       if (curByte < 0x80) {
         // Normal character, just use it.
@@ -173,11 +177,11 @@ DBCSDecoder.prototype.write = function (buf) {
       // TODO: Make sure the pointer in DB18030 range
       // then continue
       if (this.gb18030 && pointer >= 0 && pointer <= 0xFF) {
-        dbcsCode = prevByte
+        // dbcsCode = prevByte
         // Do GB18030
       }
       uCode = 0
-      for (let table of this.mappingTables) {
+      for (let table of mappingTables) {
         let index = table.pointers.indexOfCodePoint(pointer)
         if (index >= 0) {
           index = table.pointerToUnicodes[index]
