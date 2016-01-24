@@ -11,16 +11,24 @@ exports.convertCompressedArray = (compressed) => {
 // Search between [start, end)
 // The array[result] <= element < array[result + 1]
 const BinarySearch = exports.BinarySearch = (array, left, right, element) => {
-  left = left - 1
-  while (left + 1 < right) {
+  if (left === right) {
+    return -1
+  }
+  // console.log('BinarySearch', array, left, right, element)
+  while (left < right) {
     let mid = (left + right) >> 1
     if (array[mid] <= element) {
-      left = mid
+      left = mid + 1
     } else {
       right = mid
     }
   }
-  return left
+  // console.log(array, left, right)
+  if (array[left - 1] <= element) {
+    return left - 1
+  } else {
+    return -1
+  }
 }
 
 exports.indexOfCodePoint = (compressed, codepoint) => {
@@ -42,8 +50,8 @@ exports.indexOfCodePoint = (compressed, codepoint) => {
   }
 
   let offsetPos = BinarySearch(plane, left, right, codepoint)
-  // console.log(plane, left, right, pos, codepoint)
-  if (offsetPos < left) {
+  // console.log(plane, left, right, offsetPos, codepoint)
+  if (offsetPos < 0) {
     return -1
   }
   let offset = codepoint - plane[offsetPos]
