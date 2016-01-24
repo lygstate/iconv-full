@@ -1,7 +1,11 @@
-let fs = require('fs-extra')
-let request = require('request')
-let path = require('path')
-let errTo = require('errto')
+'use strict'
+
+const fs = require('fs-extra')
+const request = require('request')
+const path = require('path')
+const errTo = require('errto')
+
+const { UNICODE_MAX_CODEPOINT } = require('../encodings/utils')
 
 // Common utilities used in scripts.
 
@@ -86,23 +90,62 @@ exports.arrayToSortedMap = (arr) => {
 }
 
 exports.compressArray = (array) => {
-  let prev = -2
+  let prev = -1
   let offsets = []
+  let extraOffsets = []
+
+  let currentOffsets = offsets
+
   let results = []
   let pos = 0
-  for (let item of array) {
-    if (prev + 1 !== item) {
-      offsets.push(pos)
-      results.push(item)
+  let plane = 0xFFFF
+  let planes = []
+  let planeOffsets = [0]
+  let item = 0
+  for (item of array) {
+    while (item > plane) {
+      Array.prototype.push.apply(planes, results)
+      planeOffsets.push(planes.length)
+      results = []
+      if (item > UNICODE_MAX_CODEPOINT) {
+        offsets.push(pos)
+        pos = 0
+        plane = 0xFFFFFFFF
+        currentOffsets = extraOffsets
+      } else {
+        plane += 0x10000
+      }
+    }
+    if (prev + 1 !== item || results.length === 0) {
+      currentOffsets.push(pos)
+      if (item <= UNICODE_MAX_CODEPOINT) {
+        results.push(item & 0xFFFF)
+      } else {
+        results.push(item)
+      }
     }
     prev = item
     ++pos
   }
-  offsets.push(array.length)
+  let extraStart = 0
+  if (plane <= UNICODE_MAX_CODEPOINT) {
+    planeOffsets.push(array.length)
+    Array.prototype.push.apply(planes, results)
+    offsets.push(array.length)
+    results = []
+    extraOffsets.push(0)
+  } else {
+    extraStart = offsets[offsets.length - 1]
+    extraOffsets.push(pos)
+  }
   return {
-    length: results.length,
-    results: results,
-    offset: offsets
+    length: array.length,
+    offsets: offsets,
+    planeOffsets: planeOffsets,
+    planes: planes,
+    extraStart: extraStart,
+    extraPlane: results,
+    extraOffsets: extraOffsets
   }
 }
 
@@ -121,8 +164,7 @@ exports.mapToPermutation = (map) => {
     pointerToUnicodes: pointerToUnicodes,
     unicodeToPointers: unicodeToPointers,
     pointers: exports.compressArray(keys.array),
-    unicodes: exports.compressArray(values.array.filter((x) => x <= 0xFFFF)),
-    wideUnicodes: exports.compressArray(values.array.filter((x) => x > 0xFFFF))
+    unicodes: exports.compressArray(values.array)
   }
 }
 
@@ -152,8 +194,9 @@ exports.generateTable = function (name, dbcs) {
       map.set(key, value)
     }
     let permutation = exports.mapToPermutation(map)
-    permutation.size = permutation.length * 4 + (permutation.pointers.length * 4 + 2) +
-      (permutation.unicodes.length * 4 + 2) + (permutation.wideUnicodes.length * 6 + 2)
+    permutation.size = permutation.length * 4 +
+      (permutation.pointers.offsets.length * 4 + 2) +
+      (permutation.unicodes.offsets.length * 4 + 2)
     tables.push(permutation)
     totalSize += permutation.size
     dbcs = rest
