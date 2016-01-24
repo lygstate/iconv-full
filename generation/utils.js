@@ -121,7 +121,7 @@ exports.mapToPermutation = (map) => {
     pointerToUnicodes: pointerToUnicodes,
     unicodeToPointers: unicodeToPointers,
     pointers: exports.compressArray(keys.array),
-    narrowUnicodes: exports.compressArray(values.array.filter((x) => x <= 0xFFFF)),
+    unicodes: exports.compressArray(values.array.filter((x) => x <= 0xFFFF)),
     wideUnicodes: exports.compressArray(values.array.filter((x) => x > 0xFFFF))
   }
 }
@@ -153,8 +153,7 @@ exports.generateTable = function (name, dbcs) {
     }
     let permutation = exports.mapToPermutation(map)
     permutation.size = permutation.length * 4 + (permutation.pointers.length * 4 + 2) +
-      (permutation.narrowUnicodes.length * 4 + 2) + (permutation.wideUnicodes.length * 6 + 2)
-    // console.log(`permutation: ${permutation.size} ${permutation.narrowUnicodes.length} ${permutation.wideUnicodes.length}`)
+      (permutation.unicodes.length * 4 + 2) + (permutation.wideUnicodes.length * 6 + 2)
     tables.push(permutation)
     totalSize += permutation.size
     dbcs = rest
@@ -164,17 +163,18 @@ exports.generateTable = function (name, dbcs) {
   return tables
 }
 
-exports.writeTable = function (name, table) {
-  function replacer (key, value) {
-    if (value === table) {
-      return value
+exports.writeTable = function (name, tables) {
+  let lists = []
+  for (let table of tables) {
+    let tableStr = '  {\n'
+    for (let k in table) {
+      tableStr += `    "${k}":${JSON.stringify(table[k])}\n`
     }
-    if (Array.isArray(value)) {
-      return JSON.stringify(value)
-    }
-    return value
+    tableStr += '  }'
+    lists.push(tableStr)
   }
-  this.writeFile(name, JSON.stringify(table, replacer, 2))
+  let str = `[\n${lists.join(',\n')}\n]`
+  this.writeFile(name, str)
 }
 
 exports.writeFile = function (name, body) {
