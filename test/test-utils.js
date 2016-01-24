@@ -1,7 +1,7 @@
 'use strict'
 
 const utils = require('../generation/utils')
-const { BinarySearch, codePointOfIndex, indexOfCodePoint, convertCompressedArray } = require('../encodings/utils')
+const { BinarySearch, Converter } = require('../encodings/utils')
 const assert = require('assert')
 
 describe('test generation utils', function () {
@@ -37,85 +37,87 @@ describe('test generation utils', function () {
     assert.deepEqual(compressed.planes, [0, 0xFFFE, 0, 0xFFF])
   })
 
-  it('test indexOfCodePoint', function () {
+  it('test converter.indexOfCodePoint', function () {
     this.timeout(10000)
     let compressed
     let pos
+    let converter
     compressed = utils.compressArray([0, 0xFFFF, 0x20FFF, 0x20FFFF, 0x21FFFF, 0x00CA << 16 | 0x0304])
-    convertCompressedArray(compressed)
-    pos = indexOfCodePoint(compressed, 0x21FFFF)
+    converter = new Converter(compressed)
+    pos = converter.indexOfCodePoint(0x21FFFF)
     expect(pos).to.equal(4)
-    pos = indexOfCodePoint(compressed, 0x20FFFF)
+    pos = converter.indexOfCodePoint(0x20FFFF)
     expect(pos).to.equal(3)
-    pos = indexOfCodePoint(compressed, 0x21FFFE)
+    pos = converter.indexOfCodePoint(0x21FFFE)
     expect(pos).to.equal(-1)
-    pos = indexOfCodePoint(compressed, 0x22FFF0)
+    pos = converter.indexOfCodePoint(0x22FFF0)
     expect(pos).to.equal(-1)
-    pos = indexOfCodePoint(compressed, 0x00CA << 16 | 0x0304)
+    pos = converter.indexOfCodePoint(0x00CA << 16 | 0x0304)
     expect(pos).to.equal(5)
-    pos = indexOfCodePoint(compressed, (0x00CA << 16 | 0x0304) + 1)
+    pos = converter.indexOfCodePoint((0x00CA << 16 | 0x0304) + 1)
     expect(pos).to.equal(-1)
 
-    pos = indexOfCodePoint(compressed, 0)
+    pos = converter.indexOfCodePoint(0)
     expect(pos).to.equal(0)
-    pos = indexOfCodePoint(compressed, 1)
+    pos = converter.indexOfCodePoint(1)
     expect(pos).to.equal(-1)
 
-    pos = indexOfCodePoint(compressed, 0xFFFF)
+    pos = converter.indexOfCodePoint(0xFFFF)
     expect(pos).to.equal(1)
 
-    pos = indexOfCodePoint(compressed, 0x10000)
+    pos = converter.indexOfCodePoint(0x10000)
     expect(pos).to.equal(-1)
-    pos = indexOfCodePoint(compressed, 0x1FFFF)
+    pos = converter.indexOfCodePoint(0x1FFFF)
     expect(pos).to.equal(-1)
-    pos = indexOfCodePoint(compressed, 0x20000)
+    pos = converter.indexOfCodePoint(0x20000)
     expect(pos).to.equal(-1)
-    pos = indexOfCodePoint(compressed, 0x20FFF)
+    pos = converter.indexOfCodePoint(0x20FFF)
     expect(pos).to.equal(2)
 
     compressed = utils.compressArray([0, 0xFFFF, 0x20FFF, 0x21000, 0x20FFFF, 0x21FFFF, 0x00CA << 16 | 0x0304])
-    convertCompressedArray(compressed)
-    pos = indexOfCodePoint(compressed, 0x21000)
+    converter = new Converter(compressed)
+    pos = converter.indexOfCodePoint(0x21000)
     expect(pos).to.equal(3)
 
     compressed = utils.compressArray([0, 0xFFFE, 0xFFFF, 0x10000, 0x10001, 0x20FFF, 0x21000, 0x20FFFF, 0x21FFFF, 0x00CA << 16 | 0x0304])
-    convertCompressedArray(compressed)
-    pos = indexOfCodePoint(compressed, 0xFFFE)
+    converter = new Converter(compressed)
+    pos = converter.indexOfCodePoint(0xFFFE)
     expect(pos).to.equal(1)
-    pos = indexOfCodePoint(compressed, 0)
+    pos = converter.indexOfCodePoint(0)
     expect(pos).to.equal(0)
-    pos = indexOfCodePoint(compressed, 0xFFFF)
+    pos = converter.indexOfCodePoint(0xFFFF)
     expect(pos).to.equal(2)
 
     for (let i = 0; i < 10000; ++i) {
-      indexOfCodePoint(compressed, 0xFFFF)
+      converter.indexOfCodePoint(0xFFFF)
     }
     let start = Date.now()
     let bytes = 20000000
     for (let i = 0; i < (bytes >> 1); ++i) {
-      indexOfCodePoint(compressed, 0xFFFE)
+      converter.indexOfCodePoint(0xFFFE)
     }
     let rate = bytes / (((Date.now() - start) / 1000) * (1024 * 1024))
     console.log(`Speed rate: ${rate.toFixed(2)}MByte/s`)
   })
 
-  it('test codePointOfIndex', function () {
+  it('test converter.codePointOfIndex', function () {
     this.timeout(10000)
     let compressed
+    let converter
     let array = [0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0x10, 0x11, 0x12, 0x13, 0x1000, 0xFFFE, 0xFFFF]
     compressed = utils.compressArray(array)
-    convertCompressedArray(compressed)
-    assert.equal(codePointOfIndex(compressed, -1), -1)
+    converter = new Converter(compressed)
+    assert.equal(converter.codePointOfIndex(-1), -1)
     let result = []
     for (let i = 0; i < array.length; ++i) {
-      result.push(codePointOfIndex(compressed, i))
+      result.push(converter.codePointOfIndex(i))
     }
     assert.deepEqual(result, array)
-    assert.equal(codePointOfIndex(compressed, array.length), -1)
+    assert.equal(converter.codePointOfIndex(array.length), -1)
     let start = Date.now()
     let bytes = 20000000
     for (let i = 0; i < (bytes >> 1); ++i) {
-      codePointOfIndex(compressed, i & 2)
+      converter.codePointOfIndex(i & 2)
     }
     let rate = bytes / (((Date.now() - start) / 1000) * (1024 * 1024))
     console.log(`Speed rate: ${rate.toFixed(2)}MByte/s`)
