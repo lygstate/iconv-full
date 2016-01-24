@@ -91,10 +91,12 @@ describe('test generation utils', function () {
       indexOfCodePoint(compressed, 0xFFFF)
     }
     let start = Date.now()
-    for (let i = 0; i < 20000000; ++i) {
+    let bytes = 20000000
+    for (let i = 0; i < (bytes >> 1); ++i) {
       indexOfCodePoint(compressed, 0xFFFF)
     }
-    console.log(`Time consumed ${Date.now() - start}`)
+    let rate = bytes / (((Date.now() - start) / 1000) * (1024 * 1024))
+    console.log(`Speed rate: ${rate.toFixed(2)}MByte/s`)
   })
 
   it('test binary Search', function () {
