@@ -181,6 +181,7 @@ DBCSDecoder.prototype.write = function (buf) {
         // Do GB18030
       }
       uCode = 0
+
       for (let table of mappingTables) {
         let index = table.pointers.indexOfCodePoint(pointer)
         if (index >= 0) {
@@ -199,11 +200,11 @@ DBCSDecoder.prototype.write = function (buf) {
     // Write the character to buffer, handling higher planes using surrogate pair.
     if (uCode > 0xFFFF) {
       uCode -= 0x10000
-      const uCodeLead = 0xD800 + Math.floor(uCode / 0x400)
+      const uCodeLead = 0xD800 + (uCode >>> 10)
       newBuf[j++] = uCodeLead & 0xFF
       newBuf[j++] = uCodeLead >> 8
 
-      uCode = 0xDC00 + uCode % 0x400
+      uCode = 0xDC00 + (uCode & 0x3FF)
     }
     newBuf[j++] = uCode & 0xFF
     newBuf[j++] = uCode >> 8
