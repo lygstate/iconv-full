@@ -1,4 +1,12 @@
 {
   "ecmaVersion": 6,
-  "libs": []
+  "libs": ["browser"],
+  "plugins": {
+    "complete_strings": {},
+    "node": {},
+    "angular": {},
+    "doc_comment": {
+      "fullDocs": false
+    }
+  }
 }

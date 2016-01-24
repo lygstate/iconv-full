@@ -109,14 +109,18 @@ exports.compressArray = (array) => {
 exports.mapToPermutation = (map) => {
   let keys = exports.arrayToSortedMap(map.keys())
   let values = exports.arrayToSortedMap(map.values())
-  let permutation = []
+  let pointerToUnicodes = new Array(keys.array.length)
+  let unicodeToPointers = new Array(keys.array.length)
   for (let key of keys.array) {
-    permutation.push([keys.poses[key], values.poses[map.get(key)]])
+    pointerToUnicodes[keys.poses[key]] = values.poses[map.get(key)]
+    unicodeToPointers[values.poses[map.get(key)]] = keys.poses[key]
   }
+
   return {
-    length: permutation.length,
-    permutation: permutation,
-    keys: exports.compressArray(keys.array),
+    length: pointerToUnicodes.length,
+    pointerToUnicodes: pointerToUnicodes,
+    unicodeToPointers: unicodeToPointers,
+    pointers: exports.compressArray(keys.array),
     narrowUnicodes: exports.compressArray(values.array.filter((x) => x <= 0xFFFF)),
     wideUnicodes: exports.compressArray(values.array.filter((x) => x > 0xFFFF))
   }
@@ -148,7 +152,7 @@ exports.generateTable = function (name, dbcs) {
       map.set(key, value)
     }
     let permutation = exports.mapToPermutation(map)
-    permutation.size = permutation.length * 2 + (permutation.keys.length * 4 + 2) +
+    permutation.size = permutation.length * 4 + (permutation.pointers.length * 4 + 2) +
       (permutation.narrowUnicodes.length * 4 + 2) + (permutation.wideUnicodes.length * 6 + 2)
     // console.log(`permutation: ${permutation.size} ${permutation.narrowUnicodes.length} ${permutation.wideUnicodes.length}`)
     tables.push(permutation)
