@@ -163,18 +163,36 @@ exports.generateTable = function (name, dbcs) {
   return tables
 }
 
-exports.writeTable = function (name, tables) {
-  let lists = []
-  for (let table of tables) {
-    let tableStr = '  {\n'
-    for (let k in table) {
-      tableStr += `    "${k}":${JSON.stringify(table[k])}\n`
+exports.toJSON = (existIndent, indent, v) => {
+  if (Array.isArray(v)) {
+    if (v.length <= 0 | v.length > 0 && typeof v[0] !== 'object') {
+      return JSON.stringify(v)
     }
-    tableStr += '  }'
-    lists.push(tableStr)
+    let lists = []
+    for (let item of v) {
+      let str = exports.toJSON(existIndent + indent, indent, item)
+      lists.push(`${existIndent}${indent}{\n${str}\n${existIndent}${indent}}`)
+    }
+    return `[\n${lists.join(',\n')}\n]`
   }
-  let str = `[\n${lists.join(',\n')}\n]`
-  this.writeFile(name, str)
+  if (typeof v === 'object') {
+    let items = []
+    for (let k in v) {
+      let value = v[k]
+      let str = exports.toJSON(existIndent + indent, indent, value)
+      if (Array.isArray(value) || typeof value !== 'object') {
+        items.push(`${existIndent}${indent}"${k}": ${str}`)
+      } else {
+        items.push(`${existIndent}${indent}"${k}": {\n${str}\n${existIndent}${indent}}`)
+      }
+    }
+    return `${items.join(`,\n`)}`
+  }
+  return JSON.stringify(v)
+}
+
+exports.writeTable = function (name, tables) {
+  this.writeFile(name, exports.toJSON('', '  ', tables))
 }
 
 exports.writeFile = function (name, body) {
