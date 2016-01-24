@@ -31,6 +31,24 @@ const BinarySearch = exports.BinarySearch = (array, left, right, element) => {
   }
 }
 
+exports.indexOfCodePointDirect = (compressed, codepoint) => {
+  codepoint = codepoint & 0xFFFF
+  let plane = compressed.planes
+  let offsets = compressed.offsets
+  let offsetPos = BinarySearch(plane, 0, offsets.length, codepoint)
+  if (offsetPos < 0) {
+    return -1
+  }
+  let offset = codepoint - plane[offsetPos]
+  let baseOffset = offsets[offsetPos]
+  let maxOffset = offsets[offsetPos + 1]
+  let finalOffset = baseOffset + offset
+  if (finalOffset >= maxOffset) {
+    return -1
+  }
+  return finalOffset
+}
+
 exports.indexOfCodePoint = (compressed, codepoint) => {
   let left = 0
   let right = compressed.extraPlane.length
@@ -65,4 +83,10 @@ exports.indexOfCodePoint = (compressed, codepoint) => {
 }
 
 exports.codePointOfIndex = (compressed, index) => {
+  if (index < compressed.extraStart) {
+    let offsets = compressed.offsets
+    let pos = BinarySearch(offsets, 0, offsets.length)
+    let codepointBegin = compressed.planePos[pos]
+
+  }
 }

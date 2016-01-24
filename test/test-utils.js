@@ -1,7 +1,7 @@
 'use strict'
 
 const utils = require('../generation/utils')
-const { BinarySearch, indexOfCodePoint, convertCompressedArray } = require('../encodings/utils')
+const { BinarySearch, indexOfCodePoint, indexOfCodePointDirect, convertCompressedArray } = require('../encodings/utils')
 const assert = require('assert')
 
 describe('test generation utils', function () {
@@ -93,10 +93,24 @@ describe('test generation utils', function () {
     let start = Date.now()
     let bytes = 20000000
     for (let i = 0; i < (bytes >> 1); ++i) {
-      indexOfCodePoint(compressed, 0xFFFF)
+      indexOfCodePoint(compressed, 0xFFFE)
     }
     let rate = bytes / (((Date.now() - start) / 1000) * (1024 * 1024))
     console.log(`Speed rate: ${rate.toFixed(2)}MByte/s`)
+
+    compressed = utils.compressArray([0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0x10, 0x11, 0x12, 0x13, 0x1000, 0xFFFE, 0xFFFF])
+    convertCompressedArray(compressed)
+    for (let i = 0; i < 10000; ++i) {
+      indexOfCodePointDirect(compressed, 0x7)
+    }
+
+    bytes = 20000000
+    start = Date.now()
+    for (let i = 0; i < (bytes >> 1); ++i) {
+      indexOfCodePointDirect(compressed, 0x1000)
+    }
+    rate = bytes / (((Date.now() - start) / 1000) * (1024 * 1024))
+    console.log(`Speed rate direct: ${rate.toFixed(2)}MByte/s`)
   })
 
   it('test binary Search', function () {
