@@ -1,7 +1,7 @@
 'use strict'
 
 const utils = require('../generation/utils')
-const { BinarySearch, indexOfCodePoint, indexOfCodePointDirect, convertCompressedArray } = require('../encodings/utils')
+const { BinarySearch, codePointOfIndex, indexOfCodePoint, convertCompressedArray } = require('../encodings/utils')
 const assert = require('assert')
 
 describe('test generation utils', function () {
@@ -97,20 +97,28 @@ describe('test generation utils', function () {
     }
     let rate = bytes / (((Date.now() - start) / 1000) * (1024 * 1024))
     console.log(`Speed rate: ${rate.toFixed(2)}MByte/s`)
+  })
 
-    compressed = utils.compressArray([0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0x10, 0x11, 0x12, 0x13, 0x1000, 0xFFFE, 0xFFFF])
+  it('test codePointOfIndex', function () {
+    this.timeout(10000)
+    let compressed
+    let array = [0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0x10, 0x11, 0x12, 0x13, 0x1000, 0xFFFE, 0xFFFF]
+    compressed = utils.compressArray(array)
     convertCompressedArray(compressed)
-    for (let i = 0; i < 10000; ++i) {
-      indexOfCodePointDirect(compressed, 0x7)
+    assert.equal(codePointOfIndex(compressed, -1), -1)
+    let result = []
+    for (let i = 0; i < array.length; ++i) {
+      result.push(codePointOfIndex(compressed, i))
     }
-
-    bytes = 20000000
-    start = Date.now()
+    assert.deepEqual(result, array)
+    assert.equal(codePointOfIndex(compressed, array.length), -1)
+    let start = Date.now()
+    let bytes = 20000000
     for (let i = 0; i < (bytes >> 1); ++i) {
-      indexOfCodePointDirect(compressed, 0x1000)
+      codePointOfIndex(compressed, i & 2)
     }
-    rate = bytes / (((Date.now() - start) / 1000) * (1024 * 1024))
-    console.log(`Speed rate direct: ${rate.toFixed(2)}MByte/s`)
+    let rate = bytes / (((Date.now() - start) / 1000) * (1024 * 1024))
+    console.log(`Speed rate: ${rate.toFixed(2)}MByte/s`)
   })
 
   it('test binary Search', function () {

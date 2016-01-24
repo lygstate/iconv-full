@@ -127,7 +127,6 @@ exports.compressArray = (array) => {
     prev = item
     ++pos
   }
-  let extraStart = 0
   if (plane <= UNICODE_MAX_CODEPOINT) {
     planeOffsets.push(array.length)
     Array.prototype.push.apply(planes, results)
@@ -135,9 +134,9 @@ exports.compressArray = (array) => {
     results = []
     extraOffsets.push(0)
   } else {
-    extraStart = offsets[offsets.length - 1]
     extraOffsets.push(pos)
   }
+  let extraStart = offsets[offsets.length - 1]
   return {
     length: array.length,
     offsets: offsets,
