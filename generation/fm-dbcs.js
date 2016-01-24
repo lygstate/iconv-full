@@ -5,12 +5,7 @@ const errTo = require('errto')
 const async = require('async')
 
 function initDBCS (last) {
-  last = last || 0x7f
-  let to = []
-  for (let i = 0; i <= last; ++i) {
-    to.push([i, i])
-  }
-  return to
+  return []
 }
 
 // Add char sequences that are not in the index file (as given in http://encoding.spec.whatwg.org/#big5-encoder)
@@ -84,8 +79,8 @@ async.parallel({
   // Calculate difference between GB18030 encoding and cp936.
   // See http://encoding.spec.whatwg.org/#gb18030-encoder
   let gbk = initDBCS()
-  gbk.push([0x80, '€'.charCodeAt(0)]) // 0x80 is the Euro dollor symbol
   exports.convertWhatWgTable(data.$gbk, gbk, toIdxGBK)
+  gbk.push([0x80, '€'.charCodeAt(0)]) // 0x80 is the Euro dollor symbol
   // TODO: Compare GBK & cp936
   // utils.writeTable('cp936', utils.generateTable(data.cp936))
   utils.generateTable('gbk', gbk)

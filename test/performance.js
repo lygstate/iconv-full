@@ -1,7 +1,4 @@
 
-if (module.parent) // Skip this file from testing.
-    return;
-
 var iconv = require('iconv');
 var iconv_lite = require("../");
 
@@ -67,4 +64,3 @@ var duration = Date.now() - start;
 var mbs = convertTimes*buf.length/duration/1024;
 
 console.log("iconv-lite: "+duration+"ms, "+mbs.toFixed(2)+" Mb/s.");
-
