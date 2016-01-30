@@ -105,8 +105,8 @@ exports.compressArray = (array) => {
   for (item of array) {
     while (item > plane) {
       Array.prototype.push.apply(planes, results)
-      planeOffsets.push(planes.length)
       results = []
+      planeOffsets.push(offsets.length)
       if (item > UNICODE_MAX_CODEPOINT) {
         offsets.push(pos)
         pos = 0
@@ -128,8 +128,8 @@ exports.compressArray = (array) => {
     ++pos
   }
   if (plane <= UNICODE_MAX_CODEPOINT) {
-    planeOffsets.push(array.length)
     Array.prototype.push.apply(planes, results)
+    planeOffsets.push(offsets.length)
     offsets.push(array.length)
     results = []
     extraOffsets.push(0)
@@ -167,12 +167,14 @@ exports.mapToPermutation = (map) => {
   }
 }
 
+exports.allTables = []
+
 // Input: map <dbcs num> -> <unicode num>
 // Resulting format: Array of chunks, each chunk is:
 // [0] = address of start of the chunk, hex string.
 // <str> - characters of the chunk.
 // <num> - increasing sequence of the length num, starting with prev character.
-exports.generateTable = function (name, dbcs) {
+exports.generateTable = function (name, dbcs, final) {
   let tables = []
   let totalSize = 0
   while (dbcs.length > 0) {
@@ -202,7 +204,54 @@ exports.generateTable = function (name, dbcs) {
   }
   console.log(`Need space for ${name} is ${totalSize} Bytes, table count: ${tables.length}`)
   exports.writeTable(name, tables)
+  exports.allTables.push([name, tables])
+  if (final === true) {
+    exports.outputRustTable()
+  }
   return tables
+}
+
+exports.outputRustTable = () => {
+  let rustEncodings = []
+  for (let [name, tables] of exports.allTables) {
+    name = name.replace('-', '_').toUpperCase()
+    const firstLine = `pub const ${name}: &'static[ConverterTable] = &[\n`
+    const lastLine = '\n];\n'
+    const allRustTables = []
+    for (let table of tables) {
+      const pointer_to_unicodes = JSON.stringify(table.pointerToUnicodes)
+      const unicode_to_pointers = JSON.stringify(table.unicodeToPointers)
+      let singleRustTable = `    ConverterTable {
+        size: ${table.size},
+        length: ${table.length},
+        pointer_to_unicodes: &${pointer_to_unicodes},
+        unicode_to_pointers: &${unicode_to_pointers},
+        pointers: ConverterCompressed {
+            length: ${table.pointers.length},
+            offsets: &${JSON.stringify(table.pointers.offsets)},
+            planes: &${JSON.stringify(table.pointers.planes)},
+            plane_offsets: &${JSON.stringify(table.pointers.planeOffsets)},
+            extra_start: ${table.pointers.extraStart},
+            extra_plane: &${JSON.stringify(table.pointers.extraPlane)},
+            extra_offsets: &${JSON.stringify(table.pointers.extraOffsets)}
+        },
+        unicodes: ConverterCompressed {
+            length: ${table.unicodes.length},
+            offsets: &${JSON.stringify(table.unicodes.offsets)},
+            planes: &${JSON.stringify(table.unicodes.planes)},
+            plane_offsets: &${JSON.stringify(table.unicodes.planeOffsets)},
+            extra_start: ${table.unicodes.extraStart},
+            extra_plane: &${JSON.stringify(table.unicodes.extraPlane)},
+            extra_offsets: &${JSON.stringify(table.unicodes.extraOffsets)}
+        }
+    }`
+      allRustTables.push(singleRustTable)
+    }
+
+    let allLines = firstLine + allRustTables.join(',\n') + lastLine
+    rustEncodings.push(allLines)
+  }
+  exports.writeFile('rust-table', rustEncodings.join('\n'), '.rs')
 }
 
 exports.toJSON = (existIndent, indent, v) => {
@@ -237,8 +286,8 @@ exports.writeTable = function (name, tables) {
   this.writeFile(name, exports.toJSON('', '  ', tables))
 }
 
-exports.writeFile = function (name, body) {
+exports.writeFile = function (name, body, ext) {
   let tablesDir = path.join(__dirname, '../encodings/tables')
   fs.mkdirsSync(tablesDir)
-  fs.writeFileSync(path.join(tablesDir, name + '.json'), body)
+  fs.writeFileSync(path.join(tablesDir, name + (ext || '.json')), body)
 }

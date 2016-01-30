@@ -101,6 +101,6 @@ async.parallel({
   exports.convertWhatWgTable(data.$eucKr, eucKr, toIdxKR)
   // TODO: Compare CP949 eucKr
 
-  utils.generateTable('euc-kr', eucKr)
+  utils.generateTable('euc-kr', eucKr, true)
   console.log('DBCS encodings regenerated.')
 }))
